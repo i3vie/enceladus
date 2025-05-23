@@ -1,4 +1,5 @@
 import { ClientEvents, Client, Message } from "oceanic.js";
+import Bot from "../bot.js";
 
 /**
  * Type for a bot event handler.
@@ -6,7 +7,7 @@ import { ClientEvents, Client, Message } from "oceanic.js";
  */
 type BotEvent<K extends keyof ClientEvents> = {
     eventName: K;
-    trigger: (...args: ClientEvents[K]) => Promise<void>;
+    trigger(bot: Bot, ...args: ClientEvents[K]): Promise<void>;
 }
 
 export default BotEvent;

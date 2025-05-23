@@ -1,18 +1,23 @@
 import BotEvent from "../types/botEvent";
-import { Message, Client, ChannelTypes } from "oceanic.js";
+import { Message, Client, ChannelTypes, Embed, CreateMessageOptions } from "oceanic.js";
 import { prefix } from "../../botconfig.json";
 import prisma from "../util/prisma"
 import { Decimal } from "@prisma/client/runtime/library";
+import { CommandContext } from "../types/botCommand";
+import Bot from "../bot";
 
-const messageCreateEvent: BotEvent<"messageCreate"> = {
+export default {
     eventName: "messageCreate",
-    trigger: async (msg: Message) => {
-        if (msg.author.bot) return;
+    async trigger(bot: Bot, msg: Message) {
+        if (msg.author.bot || !msg.content.startsWith(prefix)) return;
+
+        const [commandName, ...args] = msg.content.slice(prefix.length).trim().split(/ +/);
+
+        if (commandName.match(/^[a-zA-Z0-9]+$/) == null) return;
 
         const channelName = msg.channel?.type === ChannelTypes.GUILD_TEXT ? "#"+msg.channel.name : msg.channel?.toString();
-        console.debug(`${msg.author.username} in ${channelName}: ${msg.content}`);
 
-        if (!msg.content.startsWith(prefix)) return;
+        console.debug(`${channelName} ${msg.author.username} ${commandName} ${args.join(" ")}`);
 
         const user = await prisma.user.upsert({
             where: { id: msg.author.id },
@@ -23,11 +28,16 @@ const messageCreateEvent: BotEvent<"messageCreate"> = {
             }
         })
 
-        const args = msg.content.slice(prefix.length).trim().split(/ +/);
+        const ctx = new CommandContext(
+            msg,
+            args,
+            msg.author,
+        )
 
-        console.debug(`Command: ${args[0]}, Args: ${args.slice(1).join(", ")}`);
+        bot.commands.get(commandName)?.execute(ctx).then((succeeded: boolean) => {
+            console.log(`Command ${commandName} executed with result: ${succeeded}`);
+        }).catch((err: Error) => {
+            console.error(`Error executing command ${commandName}:`, err);
+        });
     }
-}
-
-export default messageCreateEvent;
-
+} as BotEvent<"messageCreate">
