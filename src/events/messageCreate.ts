@@ -29,7 +29,18 @@ export default {
 
         const command = bot.commands.get(commandName);
 
-        const ctx = new CommandContext(bot, msg, args, msg.author, msg.member ?? undefined, command?.options ?? undefined);
+        let ctx: CommandContext<any>;
+
+        try {
+            ctx = new CommandContext(bot, msg, args, msg.author, msg.member ?? undefined, command?.options ?? undefined);
+        } catch (err) {
+            const user = msg.author.username;
+            const char = chalk.red("✗");
+            const color = chalk.red;
+            const guildName = msg.guild ? `${msg.guild.name}` : "DM";
+            console.debug(color(`${char} [${guildName} » ${channelName}] ${user} ran command ${commandName} ${args}`));
+            return;
+        }
 
         command?.execute(ctx).then((succeeded: boolean) => { // This way lies madness
             const user = msg.author.username;
