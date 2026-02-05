@@ -5,6 +5,7 @@ import prisma from "../util/prisma"
 import { CommandContext } from "../types/botCommand";
 import Bot from "../bot";
 import { Decimal } from "@prisma/client/runtime/client";
+import chalk from "chalk";
 
 export default {
     eventName: "messageCreate",
@@ -17,8 +18,6 @@ export default {
 
         const channelName = msg.channel?.type === ChannelTypes.GUILD_TEXT ? "#"+msg.channel.name : msg.channel?.toString();
 
-        console.debug(`${channelName} ${msg.author.username} ${commandName} ${args.join(" ")}`);
-
         const user = await prisma.user.upsert({
             where: { id: msg.author.id },
             update: {},
@@ -28,10 +27,18 @@ export default {
             }
         })
 
-        const ctx = new CommandContext(msg, args, msg.author)
+        const command = bot.commands.get(commandName);
 
-        bot.commands.get(commandName)?.execute(ctx).then((succeeded: boolean) => {
-            console.log(`Command ${commandName} executed with result: ${succeeded}`);
+        const ctx = new CommandContext(bot, msg, args, msg.author, msg.member ?? undefined, command?.options ?? undefined);
+
+        command?.execute(ctx).then((succeeded: boolean) => { // This way lies madness
+            const user = msg.author.username;
+            const char = succeeded ? chalk.green("✓") : chalk.red("✗");
+            const color = succeeded ? chalk.green : chalk.red;
+            const channelName = msg.channel?.type === ChannelTypes.GUILD_TEXT ? "#"+msg.channel.name : msg.channel?.toString();
+            const guildName = msg.guild ? `${msg.guild.name}` : "DM";
+
+            console.debug(color(`${char} [${guildName} » ${channelName}] ${user} ran command ${commandName} ${args}`));
         }).catch((err: Error) => {
             console.error(`Error executing command ${commandName}:`, err);
         });

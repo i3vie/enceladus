@@ -1,4 +1,6 @@
 import { User, Member, Message, Client, Embed } from "oceanic.js";
+import Bot from "../bot";
+import { raw } from "@prisma/client/runtime/client";
 
 type StringType = "string";
 type NumberType = "number";
@@ -14,67 +16,90 @@ type TypeMap = {
 
 interface CommandOption {
     type: CommandOptionType;
-    name: string; // bongaloids 
+    name: string;
     description?: string;
     optional?: boolean;
 }
- 
-type OptionsToArgs<T extends readonly CommandOption[]> = {
-    [Option in T[number] as Option['name']]: TypeMap[Option['type']]
+
+type ArgPrimitive = string | number | boolean;
+
+type Argument<T extends ArgPrimitive> = {
+    value: T;
 }
+
+type OptionToType<O extends CommandOption> =
+    O["type"] extends "string" ? string :
+    O["type"] extends "number" ? number :
+    O["type"] extends "boolean" ? boolean :
+    never;
+
+type ArgsFromOptions<T extends readonly CommandOption[]> = {
+    [O in T[number] as O["name"]]: OptionToType<O>
+};
 
 export type CommandCategory = "general" | "admin" | "fun" | "utility" | "music" | "games";
 
 export class CommandContext<T extends readonly CommandOption[]> {
     message: Message;
-    args: OptionsToArgs<T>;
+    args: Partial<Record<string, ArgPrimitive>>;
     user: User;
     member?: Member;
+    bot: Bot;
 
     constructor(
+        bot: Bot,
         message: Message,
         rawArgs: string[],
         user: User,
         member?: Member,
         options?: T
     ) {
-        // Build the typed args object
-        const args = {} as OptionsToArgs<T>;
-        
+        this.args = {};
+
         if (options) {
-            options.forEach((option, index) => {
-                const rawValue = rawArgs[index];
-                
-                // Skip if value is undefined and option is optional
-                if (rawValue === undefined) {
-                    if (!option.optional) {
-                        console.warn(`Missing required argument: ${option.name}`);
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                const rawArg = rawArgs[i];
+
+                if (rawArg === undefined) {
+                    if (option.optional) {
+                        continue;
+                    } else {
+                        throw new Error(`Missing required argument: ${option.name}`);
                     }
-                    return;
                 }
-                
-                // Parse based on the expected type
+
+                let parsedValue: ArgPrimitive;
+
                 switch (option.type) {
                     case "string":
-                        args[option.name as keyof OptionsToArgs<T>] = rawValue as any;
+                        parsedValue = rawArg;
                         break;
                     case "number":
-                        const numValue = Number(rawValue);
-                        if (!isNaN(numValue)) {
-                            args[option.name as keyof OptionsToArgs<T>] = numValue as any;
+                        const num = Number(rawArg);
+                        if (isNaN(num)) {
+                            throw new Error(`Invalid number for argument: ${option.name}`);
                         }
+                        parsedValue = num;
                         break;
                     case "boolean":
-                        args[option.name as keyof OptionsToArgs<T>] = (rawValue.toLowerCase() === "true" || rawValue === "1") as any;
+                        parsedValue = rawArg.toLowerCase() === "true";
                         break;
                 }
+
+                this.args[option.name] = parsedValue;
+            }
+        } else {
+            rawArgs.forEach((arg, i) => {
+                this.args[i.toString()] = arg;
             });
         }
 
+
         this.message = message;
-        this.args = args;
         this.user = user;
         this.member = member;
+        this.bot = bot;
     }
 
     /**
@@ -95,8 +120,14 @@ export class CommandContext<T extends readonly CommandOption[]> {
         if (trueReply) {
             options.messageReference = { messageID: this.message.id };
         }
-        
+
         return this.message.channel!.createMessage(options);
+    }
+
+    getArgument<K extends keyof ArgsFromOptions<T>>(
+        name: K
+    ): ArgsFromOptions<T>[K] | undefined {
+        return this.args[name] as ArgsFromOptions<T>[K];
     }
 }
 
