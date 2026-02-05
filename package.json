@@ -1,17 +1,23 @@
 {
+	"name": "enceladus",
+	"description": "Hog-Bot, a Discord bot for hog related activities.",
 	"scripts": {
 		"start": "tsc && node dist/index.js",
 		"watch": "tsc --watch"
 	},
 	"devDependencies": {
-		"@types/node": "^22.15.18",
+		"@types/node": "^22.19.8",
+		"@types/pg": "^8.16.0",
+		"prisma": "7.3.0",
 		"ts-node": "^10.9.2",
-		"typescript": "^5.8.3"
+		"typescript": "^5.9.3"
 	},
+	"packageManager": "pnpm@10.28.0",
 	"dependencies": {
 		"@oceanicjs/builders": "^1.1.11",
-		"@prisma/client": "6.8.2",
-		"oceanic.js": "^1.12.0",
-		"prisma": "^6.8.2"
+		"@prisma/adapter-pg": "^7.3.0",
+		"@prisma/client": "^7.3.0",
+		"oceanic.js": "^1.13.0",
+		"pg": "^8.18.0"
 	}
 }

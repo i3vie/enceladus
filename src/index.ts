@@ -1,6 +1,7 @@
 import "./util/util"
 import Bot from "./bot";
 import * as config from "../botconfig.json";
+import 'dotenv/config';
 
 const bot = new Bot(config.token);
 

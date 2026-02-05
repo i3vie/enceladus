@@ -2,9 +2,9 @@ import BotEvent from "../types/botEvent";
 import { Message, Client, ChannelTypes, Embed, CreateMessageOptions } from "oceanic.js";
 import { prefix } from "../../botconfig.json";
 import prisma from "../util/prisma"
-import { Decimal } from "@prisma/client/runtime/library";
 import { CommandContext } from "../types/botCommand";
 import Bot from "../bot";
+import { Decimal } from "@prisma/client/runtime/client";
 
 export default {
     eventName: "messageCreate",
@@ -28,11 +28,7 @@ export default {
             }
         })
 
-        const ctx = new CommandContext(
-            msg,
-            args,
-            msg.author,
-        )
+        const ctx = new CommandContext(msg, args, msg.author)
 
         bot.commands.get(commandName)?.execute(ctx).then((succeeded: boolean) => {
             console.log(`Command ${commandName} executed with result: ${succeeded}`);
