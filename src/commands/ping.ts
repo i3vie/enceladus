@@ -30,11 +30,9 @@ export default {
         embed.setColor(0x32A852);
         embed.setTitle(`Latency: ${ping}ms`);
 
-        firstMessage?.edit({
+        firstMessage!.edit({
             content: null,
             embeds: [embed.toJSON()]
         })
-
-        return true;
     }
 } as BotCommand

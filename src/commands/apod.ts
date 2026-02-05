@@ -19,8 +19,6 @@ export default {
         embed.setFooter("Image credit: " + (json.copyright || "Public Domain"))
         embed.setTimestamp(new Date(json.date))
 
-        ctx.reply(embed.toJSON(), true)
-
-        return true;
+        return embed
     }
 } as BotCommand

@@ -5,7 +5,7 @@ import BotCommand from './types/botCommand';
 import BotEvent from './types/botEvent';
 
 export default class Bot {
-    private client: Client;
+    client: Client;
     events: Map<keyof ClientEvents, BotEvent<any>>;
     commands: Map<string, BotCommand<any>>;
     prefix: string = "!";

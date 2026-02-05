@@ -6,3 +6,6 @@ import 'dotenv/config';
 const bot = new Bot(config.token);
 
 bot.start();
+
+// this exports
+export default bot;

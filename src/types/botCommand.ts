@@ -1,50 +1,47 @@
 import { User, Member, Message, Client, Embed } from "oceanic.js";
 import Bot from "../bot";
 import { raw } from "@prisma/client/runtime/client";
+import { EmbedBuilder } from "@oceanicjs/builders";
 
 type StringType = "string";
 type NumberType = "number";
 type BooleanType = "boolean";
+type UserType = "user";
 
-type CommandOptionType = StringType | NumberType | BooleanType;
+export type CommandResult = string | EmbedBuilder | null | void;
 
-type TypeMap = {
-    "string": string;
-    "number": number;
-    "boolean": boolean;
-}
+type CommandOptionType = StringType | NumberType | BooleanType | UserType;
 
 interface CommandOption {
     type: CommandOptionType;
     name: string;
     description?: string;
     optional?: boolean;
+    defaultValue?: ArgValue;
 }
 
-type ArgPrimitive = string | number | boolean;
-
-type Argument<T extends ArgPrimitive> = {
-    value: T;
-}
+type ArgValue = string | number | boolean | User;
 
 type OptionToType<O extends CommandOption> =
     O["type"] extends "string" ? string :
     O["type"] extends "number" ? number :
     O["type"] extends "boolean" ? boolean :
+    O["type"] extends "user" ? User :
     never;
 
 type ArgsFromOptions<T extends readonly CommandOption[]> = {
-    [O in T[number] as O["name"]]: OptionToType<O>
+    [O in T[number]as O["name"]]: OptionToType<O>
 };
 
 export type CommandCategory = "general" | "admin" | "fun" | "utility" | "music" | "games";
 
 export class CommandContext<T extends readonly CommandOption[]> {
     message: Message;
-    args: Partial<Record<string, ArgPrimitive>>;
+    args: Partial<Record<string, ArgValue>>;
     user: User;
     member?: Member;
     bot: Bot;
+    rawArgs: string[];
 
     constructor(
         bot: Bot,
@@ -55,6 +52,22 @@ export class CommandContext<T extends readonly CommandOption[]> {
         options?: T
     ) {
         this.args = {};
+        this.message = message;
+        this.user = user;
+        this.rawArgs = rawArgs;
+        this.member = member;
+        this.bot = bot;
+    }
+
+    static async create<T extends readonly CommandOption[]>(
+        bot: Bot,
+        message: Message,
+        rawArgs: string[],
+        user: User,
+        member?: Member,
+        options?: T
+    ): Promise<CommandContext<T>> {
+        const ctx = new CommandContext<T>(bot, message, rawArgs, user, member);
 
         if (options) {
             for (let i = 0; i < options.length; i++) {
@@ -62,45 +75,51 @@ export class CommandContext<T extends readonly CommandOption[]> {
                 const rawArg = rawArgs[i];
 
                 if (rawArg === undefined) {
-                    if (option.optional) {
-                        continue;
-                    } else {
-                        throw new Error(`Missing required argument: ${option.name}`);
-                    }
+                    if (option.optional) continue;
+                    throw new Error(`Missing required argument: ${option.name}`);
                 }
 
-                let parsedValue: ArgPrimitive;
+                let parsed: ArgValue;
 
                 switch (option.type) {
                     case "string":
-                        parsedValue = rawArg;
+                        parsed = rawArg;
                         break;
-                    case "number":
+
+                    case "number": {
                         const num = Number(rawArg);
                         if (isNaN(num)) {
                             throw new Error(`Invalid number for argument: ${option.name}`);
                         }
-                        parsedValue = num;
+                        parsed = num;
                         break;
+                    }
+
                     case "boolean":
-                        parsedValue = rawArg.toLowerCase() === "true";
+                        parsed = rawArg.toLowerCase() === "true";
                         break;
+
+                    case "user": {
+                        const u = await rawArg.asDiscordUser();
+                        if (!u) {
+                            throw new Error(`Invalid user for argument: ${option.name}`);
+                        }
+                        parsed = u;
+                        break;
+                    }
                 }
 
-                this.args[option.name] = parsedValue;
+                ctx.args[option.name] = parsed;
             }
         } else {
             rawArgs.forEach((arg, i) => {
-                this.args[i.toString()] = arg;
+                ctx.args[i.toString()] = arg;
             });
         }
 
-
-        this.message = message;
-        this.user = user;
-        this.member = member;
-        this.bot = bot;
+        return ctx;
     }
+
 
     /**
      * Reply to the command message.
@@ -132,15 +151,34 @@ export class CommandContext<T extends readonly CommandOption[]> {
 }
 
 export default interface BotCommand<Options extends readonly CommandOption[] = CommandOption[]> {
+    /**
+     * The name of the command.
+     */
     name: string;
+
+    /**
+     * A brief description of the command.
+     */
     description: string;
+
+    /**
+     * The category of the command.
+     */
     category: CommandCategory;
+
+    /**
+     * The options/arguments for the command.
+     */
     options?: Options;
+
+    /**
+     * Aliases for the command.
+     */
     aliases?: string[]
 
     /**
      * Executes the command.
-     * @returns String, which will be sent as a reply to the command message. or null if no reply is needed.
+     * @returns The result of the command execution.
      */
-    execute(ctx: CommandContext<NonNullable<Options>>): Promise<boolean>;
+    execute(ctx: CommandContext<NonNullable<Options>>): Promise<CommandResult>;
 }
