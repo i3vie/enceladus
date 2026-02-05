@@ -8,6 +8,7 @@ export default class Bot {
     private client: Client;
     events: Map<keyof ClientEvents, BotEvent<any>>;
     commands: Map<string, BotCommand<any>>;
+    prefix: string = "!";
 
     constructor(token: string) {
         this.events = new Map<keyof ClientEvents, BotEvent<any>>();
