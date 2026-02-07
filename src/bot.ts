@@ -103,7 +103,7 @@ export default class Bot {
      *
      * @returns Array<User>
      */
-    async combinedBotAdmins(allowCached = true) {
+    async getAdminUsers(allowCached = true) {
         const appOwners = await this.getApplicationOwners();
         const admins = await this.getBotAdmins();
 
