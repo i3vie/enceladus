@@ -9,4 +9,11 @@ datasource db {
 model User {
   id      String  @id @unique
   balance Decimal @db.Decimal()
+
+  role    UserRole @default(USER)
+}
+
+enum UserRole { // This is for bot permissions outside of Discord's scope
+  USER
+  ADMIN
 }

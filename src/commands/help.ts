@@ -37,18 +37,3 @@ To use a command, simply type it in the chat. For example, \`${ctx.bot.prefix}he
         }
     }
 } as BotCommand;
-
-class Option<T> {
-    required: boolean = false;
-    default?: T = undefined;
-    description?: string = undefined;
-
-    constructor(options: { required?: boolean, default?: T } = {}) {
-        this.required = options.required || false;
-        this.default = options.default;
-    }
-}
-const testOptions: Record<string, Option<any>> = {
-    "test": new Option<string>({ required: true }),
-    "test2": new Option<number>({ required: false })
-};

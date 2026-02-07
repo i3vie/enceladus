@@ -1,8 +1,10 @@
-import { Client, ClientEvents, Intents } from "oceanic.js";
+import { Client, ClientEvents, Intents, TeamMembershipState, User } from "oceanic.js";
 import fs from 'fs';
 import path from "path";
 import BotCommand from './types/botCommand';
 import BotEvent from './types/botEvent';
+import prisma from "./util/prisma";
+import { UserRole } from "@prisma/client";
 
 export default class Bot {
     client: Client;
@@ -43,6 +45,79 @@ export default class Bot {
 
     stop() {
         this.client.disconnect();
+    }
+
+    /**
+     * Get an array of Users who are considered "owners" of the bot application. This includes the application owner and team members with admin or developer roles.
+     * @returns Array<User>
+     */
+    async getApplicationOwners() {
+        const app = await this.client.rest.applications.getCurrent();
+        let owners: Array<User> = [];
+        if (app.team) {
+            owners = app.team.members
+                .filter(member =>
+                    (member.role == "admin" || member.role == "developer") &&
+                    member.membershipState == TeamMembershipState.ACCEPTED
+                )
+                .map(member => member.user);
+        } else if (app.owner) {
+            owners = [app.owner];
+        } else {
+            console.error("No application owners found during appOwners call?");
+        }
+
+        return owners;
+    }
+
+    /**
+     * Get an array of Users who are considered "bot admins". This is determined by the bot's internal
+     * database, not by Discord permissions. These users have elevated permissions within the bot's
+     * functionality, as defined by the bot's commands and features.
+     * @returns Array<User>
+     */
+    async getBotAdmins() {
+        const botAdmins = await prisma.user.findMany({
+            where: {
+                role: UserRole.ADMIN
+            }
+        })
+        const adminUsers = await Promise.all(
+            botAdmins.map(async (admin) => {
+                console.log(`Bot admin: ${admin.id}`);
+                const user = await this.client.rest.users.get(admin.id);
+                console.log(`Bot admin user: ${user.tag}`);
+                return user;
+            })
+        );
+        return adminUsers;
+    }
+
+    /**
+     * Get a combined list of unique Users who are either application owners or bot admins. This
+     * method is useful for commands or features that need to check if a user has any elevated
+     * permissions related to the bot, regardless of whether those permissions come from being an
+     * application owner or being designated as a bot admin in the database. If you want to know
+     * which specific role(s) a user has, you should call getApplicationOwners and getBotAdmins
+     * separately and compare the results instead of using this method.
+     *
+     * @returns Array<User>
+     */
+    async combinedBotAdmins(allowCached = true) {
+        const appOwners = await this.getApplicationOwners();
+        const admins = await this.getBotAdmins();
+
+        const uniqueUsersMap: Map<string, User> = new Map();
+
+        appOwners.forEach(owner => {
+            uniqueUsersMap.set(owner.id, owner);
+        });
+
+        admins.forEach(admin => {
+            uniqueUsersMap.set(admin.id, admin);
+        });
+
+        return Array.from(uniqueUsersMap.values());
     }
 
     private async loadEvents(): Promise<Map<keyof ClientEvents, BotEvent<any>>> {
