@@ -18,7 +18,7 @@ export default class Bot {
 
         this.client = new Client({
             auth: `Bot ${token}`, 
-            gateway: { intents: [Intents.GUILD_MESSAGES, Intents.MESSAGE_CONTENT, Intents.GUILDS]}
+            gateway: { intents: [Intents.GUILD_MESSAGES, Intents.MESSAGE_CONTENT, Intents.GUILDS, Intents.GUILD_MESSAGE_REACTIONS]}
         });
     }
 
