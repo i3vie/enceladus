@@ -16,6 +16,11 @@ export default {
         },
     ],
     async execute(ctx: CommandContext<any>) {
+        // check getAdminUsers
+        const adminUsers = await ctx.bot.getAdminUsers();
+        if (!adminUsers.some(admin => admin.id === ctx.user.id)) {
+            return "Only bot admins can use this command.";
+        }
         const command = ctx.rawArgs.join(" ");
         
         const process = exec(command, (error, stdout, stderr) => {
