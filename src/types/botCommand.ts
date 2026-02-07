@@ -42,6 +42,7 @@ export class CommandContext<T extends readonly CommandOption[]> {
     member?: Member;
     bot: Bot;
     rawArgs: string[];
+    adminOnly: boolean;
 
     constructor(
         bot: Bot,
@@ -49,7 +50,8 @@ export class CommandContext<T extends readonly CommandOption[]> {
         rawArgs: string[],
         user: User,
         member?: Member,
-        options?: T
+        options?: T,
+        adminOnly: boolean = false,
     ) {
         this.args = {};
         this.message = message;
@@ -57,6 +59,7 @@ export class CommandContext<T extends readonly CommandOption[]> {
         this.rawArgs = rawArgs;
         this.member = member;
         this.bot = bot;
+        this.adminOnly = adminOnly;
     }
 
     static async create<T extends readonly CommandOption[]>(
@@ -65,9 +68,17 @@ export class CommandContext<T extends readonly CommandOption[]> {
         rawArgs: string[],
         user: User,
         member?: Member,
-        options?: T
+        options?: T,
+        adminOnly: boolean = false,
     ): Promise<CommandContext<T>> {
         const ctx = new CommandContext<T>(bot, message, rawArgs, user, member);
+        // If the command is adminOnly, we need to check if the user is an application admin before anything else
+        if (adminOnly) {
+            const admins = await bot.getAdminUsers();
+            if (!admins.some(admin => admin.id === user.id)) {
+                throw new Error("You do not have permission to use this command.");
+            }
+        }
 
         if (options) {
             for (let i = 0; i < options.length; i++) {
@@ -175,6 +186,8 @@ export default interface BotCommand<Options extends readonly CommandOption[] = C
      * Aliases for the command.
      */
     aliases?: string[]
+
+    adminOnly?: boolean;
 
     /**
      * Executes the command.

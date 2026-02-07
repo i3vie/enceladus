@@ -22,13 +22,8 @@ export default {
             optional: false
         }
     ],
+    adminOnly: true,
     async execute(ctx: CommandContext<any>) {
-        // check getAdminUsers
-        const adminUsers = await ctx.bot.getAdminUsers();
-        if (!adminUsers.some(admin => admin.id === ctx.user.id)) {
-            return "Only bot admins can use this command.";
-        }
-
         let userToAdd = ctx.getArgument("user") as User | undefined;
         if (!userToAdd) {
             userToAdd = ctx.user;

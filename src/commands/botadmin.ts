@@ -22,14 +22,8 @@ export default {
             optional: true, // TODO: Allow functional optional and provide a partial context
         }
     ],
+    adminOnly: true,
     async execute(ctx: CommandContext<any>) {
-
-        // Check if the invoker is an application owner. If not, return early
-        const appOwners = await ctx.bot.getApplicationOwners();
-        if (!appOwners.some(owner => owner.id === ctx.user.id)) {
-            return "Only bot application owners can use this command.";
-        }
-
         if (ctx.getArgument("action") === "list") {
             const appOwners = await ctx.bot.getApplicationOwners();
             const admins = await ctx.bot.getBotAdmins();

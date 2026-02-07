@@ -32,6 +32,12 @@ export default {
             const color = chalk.red;
             const guildName = msg.guild ? `${msg.guild.name}` : "DM";
             console.debug(color(`${char} [${guildName} » ${channelName}] ${user} ran command ${commandName} ${args}`));
+            const errorEmbed = new EmbedBuilder()
+                .setTitle("Error")
+                .setDescription(err instanceof Error ? err.message : "Could not create command context.")
+                .setColor(0xFF0000)
+                .toJSON();
+            await msg.channel?.createMessage({ embeds: [errorEmbed] });
             return;
         }
 
