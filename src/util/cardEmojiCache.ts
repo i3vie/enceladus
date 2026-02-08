@@ -1,7 +1,7 @@
 import type Bot from "../bot";
 
 const CARD_EMOJI_NAME = /^(A|[2-9]|10|J|Q|K)[SHDC]$/i;
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 5 * 60 * 60 * 24 * 1000; // 5 days
 
 let cachedMentions = new Map<string, string>();
 let lastRefresh = 0;

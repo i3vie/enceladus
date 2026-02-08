@@ -25,7 +25,15 @@ export default {
         let ctx: CommandContext<any>;
 
         try {
-            ctx = await CommandContext.create(bot, msg, args, msg.author, msg.member ?? undefined, command?.options ?? undefined)
+            ctx = await CommandContext.create(
+                bot,
+                msg,
+                args,
+                msg.author,
+                msg.member ?? undefined,
+                command?.options ?? undefined,
+                command?.adminOnly ?? false
+            )
         } catch (err) {
             const user = msg.author.username;
             const char = chalk.red("✗");
