@@ -111,6 +111,10 @@ export class CommandContext<T extends readonly CommandOption[]> {
                         break;
 
                     case "user": {
+                        if (rawArg == "me" || rawArg == "@me") {
+                            parsed = user;
+                            break;
+                        }
                         const u = await rawArg.asDiscordUser();
                         if (!u) {
                             throw new Error(`Invalid user for argument: ${option.name}`);
