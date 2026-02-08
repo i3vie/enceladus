@@ -3,6 +3,7 @@ import { EmbedBuilder } from "@oceanicjs/builders";
 import prisma from "../util/prisma";
 import { clearReactionSession, registerReactionSession } from "../util/reactionSessions";
 import { getCardEmojiMentions } from "../util/cardEmojiCache";
+import { clearActiveGame, isUserInActiveGame, tryActivateGame } from "../util/activeGames";
 
 type Suit = "S" | "H" | "D" | "C";
 type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
@@ -21,6 +22,7 @@ type Outcome = "win" | "lose" | "push";
 
 const HIT_EMOJI = "🫳";
 const STAND_EMOJI = "🖐️";
+const DOUBLE_EMOJI = "🤌";
 
 const SUITS: Suit[] = ["S", "H", "D", "C"];
 const RANKS: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -108,6 +110,10 @@ export default {
             return "Bet must be a positive number.";
         }
 
+        if (isUserInActiveGame(ctx.user.id)) {
+            return "You are already in an active game.";
+        }
+
         const user = await prisma.user.upsert({
             where: { id: ctx.user.id },
             update: {},
@@ -123,6 +129,19 @@ export default {
             return "You do not have enough balance to make that bet.";
         }
 
+        const gameID = `blackjack:${ctx.user.id}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+        if (!tryActivateGame(gameID, [ctx.user.id])) {
+            return "You are already in an active game.";
+        }
+
+        let gameActive = true;
+        const releaseGame = () => {
+            if (!gameActive) return;
+            gameActive = false;
+            clearActiveGame(gameID);
+        };
+
+        try {
         const cardEmojiMentions = await getCardEmojiMentions(ctx.bot);
         const renderCard = (card: Card): string => {
             const code = cardCode(card);
@@ -137,6 +156,7 @@ export default {
         let processing = false;
         let summary = "";
         let outcome: Outcome | null = null;
+        let currentBet = bet;
 
         async function settle(result: Outcome): Promise<void> {
             if (settled) return;
@@ -145,22 +165,22 @@ export default {
             const gameOutcome = result;
 
             if (gameOutcome === "win") {
-                const newBalance = player.balance.plus(bet);
+                const newBalance = player.balance.plus(currentBet);
                 await prisma.user.update({
                     where: { id: ctx.user.id },
                     data: { balance: newBalance }
                 });
-                summary = `You won ${bet} coins. New balance: ${newBalance}.`;
+                summary = `You won ${currentBet} coins. New balance: **$${newBalance}**.`;
                 return;
             }
 
             if (gameOutcome === "lose") {
-                const newBalance = player.balance.minus(bet);
+                const newBalance = player.balance.minus(currentBet);
                 await prisma.user.update({
                     where: { id: ctx.user.id },
                     data: { balance: newBalance }
                 });
-                summary = `You lost ${bet} coins. New balance: ${newBalance}.`;
+                summary = `You lost ${currentBet} coins. New balance: **$${newBalance}**.`;
                 return;
             }
 
@@ -170,13 +190,15 @@ export default {
         function renderEmbed(revealDealer: boolean): EmbedBuilder {
             const player = handInfo(playerCards);
             const dealer = handInfo(dealerCards);
-            const dealerDisplayValue = revealDealer ? `${dealer.total}${dealer.soft ? " (ace low)" : ""}` : "?";
+            const dealerDisplayValue = revealDealer ? `${dealer.total}${dealer.soft ? " (aces high)" : ""}` : "?";
             const dealerField = `${formatCards(dealerCards, renderCard, !revealDealer)}\nTotal: ${dealerDisplayValue}`;
-            const playerField = `${formatCards(playerCards, renderCard)}\nTotal: ${player.total}${player.soft ? " (ace low)" : ""}`;
-            const status = done ? summary : (summary || `React with ${HIT_EMOJI} to hit or ${STAND_EMOJI} to stand.`);
+            const playerField = `${formatCards(playerCards, renderCard)}\nTotal: ${player.total}${player.soft ? " (aces high)" : ""}`;
+            const status = done
+                ? summary
+                : (summary || `React with ${HIT_EMOJI} to hit, ${STAND_EMOJI} to stand, or ${DOUBLE_EMOJI} to double down.`);
 
             const embed = new EmbedBuilder()
-                .setTitle(`Blackjack (bet: ${bet})`)
+                .setTitle(`Blackjack (bet: ${currentBet})`)
                 .setDescription(status)
                 .addField("**Dealer**", dealerField, true)
                 .addField("**You**", playerField, true);
@@ -197,6 +219,7 @@ export default {
             await gameMessage.deleteReactions().catch(async () => {
                 await gameMessage.deleteReaction(HIT_EMOJI).catch(() => {});
                 await gameMessage.deleteReaction(STAND_EMOJI).catch(() => {});
+                await gameMessage.deleteReaction(DOUBLE_EMOJI).catch(() => {});
             });
         }
 
@@ -219,7 +242,9 @@ export default {
         try {
             await gameMessage.createReaction(HIT_EMOJI);
             await gameMessage.createReaction(STAND_EMOJI);
+            await gameMessage.createReaction(DOUBLE_EMOJI);
         } catch {
+            releaseGame();
             return "I couldn't add reaction controls. Check channel permissions for Add Reactions.";
         }
 
@@ -237,12 +262,16 @@ export default {
             done = true;
             await gameMessage.edit({ embeds: [renderEmbed(true).toJSON()] });
             await clearControls();
+            releaseGame();
             return;
         }
 
         registerReactionSession(gameMessage.id, {
             ownerID: ctx.user.id,
             timeoutMs: 2 * 60 * 1000,
+            onClear: () => {
+                releaseGame();
+            },
             onReaction: async (_bot, message, reactor, reaction) => {
                 if (message.id !== gameMessage.id || done || processing) return;
                 processing = true;
@@ -287,11 +316,39 @@ export default {
                         await finalizeGame(gameMessage.id);
                         await gameMessage.edit({ embeds: [renderEmbed(true).toJSON()] });
                         await clearControls();
+                        return;
+                    }
+
+                    if (emoji === normalizeEmoji(DOUBLE_EMOJI)) {
+                        const doubledBet = currentBet * 2;
+                        if (player.balance.lessThan(doubledBet)) {
+                            summary = `You cannot afford to double down to ${doubledBet}.`;
+                            await gameMessage.edit({ embeds: [renderEmbed(false).toJSON()] });
+                            return;
+                        }
+
+                        currentBet = doubledBet;
+                        playerCards.push(drawCard());
+
+                        if (handValue(playerCards) > 21) {
+                            await settle("lose");
+                        } else {
+                            const outcome = await resolveDealerTurn();
+                            await settle(outcome);
+                        }
+
+                        await finalizeGame(gameMessage.id);
+                        await gameMessage.edit({ embeds: [renderEmbed(true).toJSON()] });
+                        await clearControls();
                     }
                 } finally {
                     processing = false;
                 }
             }
         });
+        } catch (err) {
+            releaseGame();
+            throw err;
+        }
     }
 } as BotCommand;

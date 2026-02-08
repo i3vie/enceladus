@@ -84,9 +84,7 @@ export default class Bot {
         })
         const adminUsers = await Promise.all(
             botAdmins.map(async (admin) => {
-                console.log(`Bot admin: ${admin.id}`);
                 const user = await this.client.rest.users.get(admin.id);
-                console.log(`Bot admin user: ${user.tag}`);
                 return user;
             })
         );

@@ -7,6 +7,7 @@ export interface ReactionSession {
     ownerID?: string;
     timeoutMs?: number;
     onReaction: (bot: Bot, ...args: MessageReactionAddArgs) => Promise<void>;
+    onClear?: () => void;
 }
 
 const sessions = new Map<string, ReactionSession>();
@@ -30,6 +31,7 @@ export function getReactionSession(messageID: string): ReactionSession | undefin
 }
 
 export function clearReactionSession(messageID: string): void {
+    const session = sessions.get(messageID);
     sessions.delete(messageID);
 
     const timer = timers.get(messageID);
@@ -37,4 +39,6 @@ export function clearReactionSession(messageID: string): void {
         clearTimeout(timer);
         timers.delete(messageID);
     }
+
+    session?.onClear?.();
 }

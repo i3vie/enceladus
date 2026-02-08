@@ -1,4 +1,4 @@
-import { Message, Client, User } from "oceanic.js";
+import { User } from "oceanic.js";
 import BotCommand, { CommandContext } from "../types/botCommand";
 import { EmbedBuilder } from "@oceanicjs/builders";
 import prisma from "../util/prisma";
@@ -58,7 +58,16 @@ export default {
             data: { balance: newPayeeBalance }
         });
 
-        return `Successfully paid **${amount}** coins to <@${payee.id}>. Your new balance is **${newPayerBalance}** coins.`;
+        const payerMention = `<@${ctx.user.id}>`;
+        const payeeMention = `<@${payee.id}>`;
+        const payerTitleName = ctx.user.globalName ?? ctx.user.username;
+        const payeeTitleName = payee.globalName ?? payee.username;
+
+        return new EmbedBuilder()
+            .setTitle("Payment")
+            .setDescription(`${payerMention} sent $${amount} to ${payeeMention}`)
+            .addField(`${payerTitleName}'s new balance`, `$${newPayerBalance}`, true)
+            .addField(`${payeeTitleName}'s new balance`, `$${newPayeeBalance}`, true);
 
     }
 } as BotCommand
