@@ -42,7 +42,7 @@ export default {
         }
 
         command?.execute(ctx).then((res: CommandResult) => { // This way lies madness
-            const succeeded = res != null;
+            const succeeded = (res == null) || (typeof res === "boolean" && res === true) || (res instanceof EmbedBuilder);
 
             switch (typeof res) {
                 case "string": ctx.reply(res, true); break;
