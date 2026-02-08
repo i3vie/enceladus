@@ -108,15 +108,15 @@ export default {
             return "Bet must be a positive number.";
         }
 
-        const user = await prisma.user.findUnique({
-            where: {
-                id: ctx.user.id
+        const user = await prisma.user.upsert({
+            where: { id: ctx.user.id },
+            update: {},
+            create: {
+                id: ctx.user.id,
+                balance: 0
             }
-        });
+        })
 
-        if (!user) {
-            return "Could not find your account.";
-        }
         const player = user; // for some reason this has to be separate to satisfy typescript
 
         if (player.balance.lessThan(bet)) {
