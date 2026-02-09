@@ -11,6 +11,8 @@ export default class Bot {
     events: Map<keyof ClientEvents, BotEvent<any>>;
     commands: Map<string, BotCommand<any>>;
     prefix: string = "!";
+    private bootstrapped = false;
+    private bootstrapPromise: Promise<void> | null = null;
 
     constructor(token: string) {
         this.events = new Map<keyof ClientEvents, BotEvent<any>>();
@@ -26,21 +28,32 @@ export default class Bot {
         this.client.on("ready", async() => {
             console.log(`Logged in as ${this.client.user.username}#${this.client.user.discriminator}`);
 
-            this.events = await this.loadEvents();
-            this.commands = await this.loadCommands();
-
-            for (const [name, event] of this.events) {
-                this.client.on(name as keyof ClientEvents, (...args) => {
-                    event.trigger(this, ...args).catch(err => {
-                        console.error(`Error in event ${name}:`, err);
-                    })
-                });
+            if (!this.bootstrapped) {
+                if (!this.bootstrapPromise) {
+                    this.bootstrapPromise = this.bootstrap();
+                }
+                await this.bootstrapPromise;
             }
 
             console.log("Ready as", this.client.user.tag);
         });
         
         this.client.connect();
+    }
+
+    private async bootstrap() {
+        this.events = await this.loadEvents();
+        this.commands = await this.loadCommands();
+
+        for (const [name, event] of this.events) {
+            this.client.on(name as keyof ClientEvents, (...args) => {
+                event.trigger(this, ...args).catch(err => {
+                    console.error(`Error in event ${name}:`, err);
+                })
+            });
+        }
+
+        this.bootstrapped = true;
     }
 
     stop() {

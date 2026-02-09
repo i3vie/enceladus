@@ -8,9 +8,9 @@ import { Decimal } from "@prisma/client/runtime/client";
 const JOIN_EMOJI = "✅";
 const BAIL_EMOJI = "🖐️";
 const JOIN_WINDOW_MS = 15_000;
-const TICK_MS = 1_250;
+const TICK_MS = 1_600;
 const START_MULTIPLIER = 0.2;
-const MULTIPLIER_FACTOR = 1.5;
+const MULTIPLIER_FACTOR = 1.33;
 const activeCrashChannels = new Set<string>();
 
 type Phase = "join" | "running" | "ended";
@@ -367,7 +367,7 @@ export default {
 
                 const nextMultiplier = currentMultiplier * MULTIPLIER_FACTOR;
                 const base = 4;
-                const curve = Math.log2(nextMultiplier / 2 + 1) * 24;
+                const curve = Math.log2(nextMultiplier / 2 + 1) * 20;
                 const noise = Math.random() * 1.5;
                 const pCrash = Math.min(base + curve + noise, 97);
                 const roll = Math.random() * 100;
