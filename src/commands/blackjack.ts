@@ -4,6 +4,7 @@ import prisma from "../util/prisma";
 import { clearReactionSession, registerReactionSession } from "../util/reactionSessions";
 import { getCardEmojiMentions } from "../util/cardEmojiCache";
 import { clearActiveGame, isUserInActiveGame, tryActivateGame } from "../util/activeGames";
+import { parseMoney } from "../util/money";
 
 type Suit = "S" | "H" | "D" | "C";
 type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
@@ -94,19 +95,19 @@ export default {
     aliases: ["bj"],
     options: [
         {
-            type: "number",
+            type: "string",
             name: "bet",
             description: "Amount to bet",
             optional: false
         }
     ],
     async execute(ctx: CommandContext<any>) {
-        const bet = ctx.getArgument("bet") as number;
-        if (Number.isNaN(bet)) {
+        const bet = parseMoney(ctx.rawArgs[0]);
+        if (!bet) {
             return "Invalid bet amount.";
         }
 
-        if (bet <= 0) {
+        if (bet.lessThanOrEqualTo(0)) {
             return "Bet must be a positive number.";
         }
 
@@ -165,26 +166,29 @@ export default {
             const gameOutcome = result;
 
             if (gameOutcome === "win") {
-                const newBalance = player.balance.plus(currentBet);
-                await prisma.user.update({
+                const updatedUser = await prisma.user.update({
                     where: { id: ctx.user.id },
-                    data: { balance: newBalance }
+                    data: { balance: { increment: currentBet } }
                 });
-                summary = `You won ${currentBet} coins. New balance: **$${newBalance}**.`;
+                summary = `You won $${currentBet.formatMoney()}. New balance: **$${updatedUser.balance.formatMoney()}**.`;
                 return;
             }
 
             if (gameOutcome === "lose") {
-                const newBalance = player.balance.minus(currentBet);
-                await prisma.user.update({
+                const updatedUser = await prisma.user.update({
                     where: { id: ctx.user.id },
-                    data: { balance: newBalance }
+                    data: { balance: { decrement: currentBet } }
                 });
-                summary = `You lost ${currentBet} coins. New balance: **$${newBalance}**.`;
+                summary = `You lost $${currentBet.formatMoney()}. New balance: **$${updatedUser.balance.formatMoney()}**.`;
                 return;
             }
 
-            summary = `Push. Your balance stays at ${player.balance}.`;
+            const latestUser = await prisma.user.findUnique({
+                where: { id: ctx.user.id },
+                select: { balance: true }
+            });
+            const currentBalance = latestUser?.balance ?? player.balance;
+            summary = `Push. Your balance stays at $${currentBalance.formatMoney()}.`;
         }
 
         function renderEmbed(revealDealer: boolean): EmbedBuilder {
@@ -198,7 +202,7 @@ export default {
                 : (summary || `React with ${HIT_EMOJI} to hit, ${STAND_EMOJI} to stand, or ${DOUBLE_EMOJI} to double down.`);
 
             const embed = new EmbedBuilder()
-                .setTitle(`Blackjack (bet: ${currentBet})`)
+                .setTitle(`Blackjack (bet: $${currentBet.formatMoney()})`)
                 .setDescription(status)
                 .addField("**Dealer**", dealerField, true)
                 .addField("**You**", playerField, true);
@@ -320,9 +324,9 @@ export default {
                     }
 
                     if (emoji === normalizeEmoji(DOUBLE_EMOJI)) {
-                        const doubledBet = currentBet * 2;
+                        const doubledBet = currentBet.mul(2);
                         if (player.balance.lessThan(doubledBet)) {
-                            summary = `You cannot afford to double down to ${doubledBet}.`;
+                            summary = `You cannot afford to double down to $${doubledBet.formatMoney()}.`;
                             await gameMessage.edit({ embeds: [renderEmbed(false).toJSON()] });
                             return;
                         }

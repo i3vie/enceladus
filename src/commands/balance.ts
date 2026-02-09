@@ -1,4 +1,4 @@
-import { Message, Client, User } from "oceanic.js";
+import { User } from "oceanic.js";
 import BotCommand, { CommandContext } from "../types/botCommand";
 import { EmbedBuilder } from "@oceanicjs/builders";
 import prisma from "../util/prisma";
@@ -39,7 +39,7 @@ export default {
 
         const embed = new EmbedBuilder();
         embed.setColor(0x32A852);
-        embed.setTitle("Balance: $" + user.balance.toFixed(2));
+        embed.setTitle("Balance: $" + user.balance.formatMoney());
 
         return embed;
     }

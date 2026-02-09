@@ -1,5 +1,6 @@
-import { Client, User } from "oceanic.js";
+import { User } from "oceanic.js";
 import bot from "../index";
+import { Decimal } from "@prisma/client/runtime/client";
 
 String.prototype.trimIndent = function (): string {
     const lines = this.replace(/^\n/, "").split("\n");
@@ -23,3 +24,17 @@ String.prototype.asDiscordUser = async function (): Promise<User> {
     const id = this.mentionID();
     return await bot.client.rest.users.get(id);
 }
+
+Decimal.prototype.formatMoney = function (fractionDigits: number = 2): string {
+    const fixed = this.toFixed(fractionDigits);
+    const negative = fixed.startsWith("-");
+    const abs = negative ? fixed.slice(1) : fixed;
+    const [intPart, fracPart = ""] = abs.split(".");
+    const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    const formatted = fractionDigits > 0
+        ? `${withCommas}.${fracPart}`
+        : withCommas;
+
+    return negative ? `-${formatted}` : formatted;
+};

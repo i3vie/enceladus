@@ -4,6 +4,7 @@ import prisma from "../util/prisma";
 import { clearReactionSession, registerReactionSession } from "../util/reactionSessions";
 import { clearActiveGame, removeUsersFromActiveGame, tryActivateGame, tryAddUsersToActiveGame } from "../util/activeGames";
 import { Decimal } from "@prisma/client/runtime/client";
+import { parseMoney } from "../util/money";
 
 const JOIN_EMOJI = "✅";
 const BAIL_EMOJI = "🖐️";
@@ -43,9 +44,7 @@ function formatMultiplier(multiplier: number): string {
 }
 
 function formatMoney(value: Decimal): string {
-    const fixed = value.toFixed(2);
-    if (fixed.endsWith(".00")) return fixed.slice(0, -3);
-    return fixed;
+    return value.formatMoney();
 }
 
 function formatSignedMoney(value: Decimal): string {
@@ -61,22 +60,20 @@ export default {
     category: "games",
     options: [
         {
-            type: "number",
+            type: "string",
             name: "bet",
             description: "Base bet per player",
             optional: false
         }
     ],
     async execute(ctx: CommandContext<any>) {
-        const baseBet = ctx.getArgument("bet") as number;
-        if (typeof baseBet !== "number" || Number.isNaN(baseBet)) {
+        const bet = parseMoney(ctx.rawArgs[0]);
+        if (!bet) {
             return "Invalid bet amount.";
         }
-        if (baseBet <= 0) {
+        if (bet.lessThanOrEqualTo(0)) {
             return "Bet must be a positive amount.";
         }
-
-        const bet = new Decimal(baseBet);
         const hostID = ctx.user.id;
         const channelID = ctx.message.channel?.id;
         if (!channelID) {

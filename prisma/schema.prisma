@@ -8,7 +8,7 @@ datasource db {
 
 model User {
   id      String  @id @unique
-  balance Decimal @db.Decimal(64, 2)
+  balance Decimal @db.Decimal(1000, 2)
 
   role    UserRole @default(USER)
 }

@@ -1,7 +1,7 @@
-import { Message, Client, User } from "oceanic.js";
+import { User } from "oceanic.js";
 import BotCommand, { CommandContext } from "../types/botCommand";
-import { EmbedBuilder } from "@oceanicjs/builders";
 import prisma from "../util/prisma";
+import { parseMoney } from "../util/money";
 
 export default {
     name: "addmoney",
@@ -16,7 +16,7 @@ export default {
             optional: true
         },
         {
-            type: "number",
+            type: "string",
             name: "amount",
             description: "Amount of money to add",
             optional: false
@@ -29,7 +29,10 @@ export default {
             userToAdd = ctx.user;
         }
 
-        const amount = ctx.getArgument("amount") as number;
+        const amount = parseMoney(ctx.rawArgs[ctx.rawArgs.length - 1]);
+        if (!amount) {
+            return "Invalid amount.";
+        }
 
         const user = await prisma.user.upsert({
             where: { id: userToAdd.id },
@@ -40,6 +43,6 @@ export default {
             }
         })
         
-        return `Added $${amount.toFixed(2)} to ${userToAdd.username}'s balance. New balance: $${user.balance.toFixed(2)}`;
+        return `Added $${amount.formatMoney()} to ${userToAdd.username}'s balance. New balance: $${user.balance.formatMoney()}`;
     }
 } as BotCommand

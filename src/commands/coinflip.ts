@@ -5,6 +5,7 @@ import { clearReactionSession, registerReactionSession } from "../util/reactionS
 import type Bot from "../bot";
 import type { User } from "oceanic.js";
 import { clearActiveGame, isUserInActiveGame, tryActivateGame } from "../util/activeGames";
+import { parseMoney } from "../util/money";
 
 type CoinSide = "heads" | "tails";
 
@@ -64,7 +65,7 @@ export default {
             optional: false
         },
         {
-            type: "number",
+            type: "string",
             name: "bet",
             description: "Amount to bet",
             optional: false
@@ -72,12 +73,12 @@ export default {
     ],
     aliases: ["cf"],
     async execute(ctx: CommandContext<any>) {
-        const bet = ctx.getArgument("bet") as number;
+        const bet = parseMoney(ctx.rawArgs[1]);
         const challengee = ctx.getArgument("user") as User | undefined;
         const challengerMention = `<@${ctx.user.id}>`;
         const challengeeMention = challengee ? `<@${challengee.id}>` : "";
 
-        if (typeof bet !== "number" || Number.isNaN(bet)) {
+        if (!bet) {
             return "Invalid bet amount.";
         }
 
@@ -101,7 +102,7 @@ export default {
             return `${challengeeMention} is already in an active game.`;
         }
 
-        if (bet <= 0) {
+        if (bet.lessThanOrEqualTo(0)) {
             return "Bet must be a positive amount.";
         }
 
@@ -153,7 +154,7 @@ export default {
         const challengeEmbed = new EmbedBuilder()
             .setTitle("Coinflip")
             .setDescription(
-                `${challengerMention} challenged ${challengeeMention} for **${bet}** coins each (pot: **${bet * 2}**).\n` +
+                `${challengerMention} challenged ${challengeeMention} for **$${bet.formatMoney()}** each (pot: **$${bet.mul(2).formatMoney()}**).\n` +
                 `React with ${ACCEPT_EMOJI} to accept or ${DECLINE_EMOJI} to decline.\n` +
                 `You have 45 seconds.`
             )
@@ -350,13 +351,13 @@ export default {
                             .setTitle("Coinflip")
                             .setDescription(
                                 `The coin landed on **${result.flip}**.\n` +
-                                `${winnerMention} won **${bet}** coins.\n` +
-                                `${loserMention} lost **${bet}** coins.`
+                                `${winnerMention} won **$${bet.formatMoney()}**.\n` +
+                                `${loserMention} lost **$${bet.formatMoney()}**.`
                             )
                             .setColor(0x57F287)
                             .addField(
                                 `${winnerTitle}'s winnings`,
-                                `**$${bet}**`,
+                                `**$${bet.formatMoney()}**`,
                                 true
                             )
                             .addField(
@@ -366,7 +367,7 @@ export default {
                             )
                             .addField(
                                 `${loserTitle}'s losses`,
-                                `**$${bet}**`,
+                                `**$${bet.formatMoney()}**`,
                                 true
                             )
                     );

@@ -3,6 +3,7 @@ import BotCommand, { CommandContext } from "../types/botCommand";
 import { EmbedBuilder } from "@oceanicjs/builders";
 import prisma from "../util/prisma";
 import { Decimal } from "@prisma/client/runtime/client";
+import { parseMoney } from "../util/money";
 
 export default {
     name: "pay",
@@ -15,7 +16,7 @@ export default {
             description: "User to pay",
         },
         {
-            type: "number",
+            type: "string",
             name: "amount",
             description: "Amount to pay",
         }
@@ -35,10 +36,13 @@ export default {
                 balance: new Decimal(0)
             }
         }) as { id: string, balance: Decimal}
-        const amount = ctx.getArgument("amount") as number
+        const amount = parseMoney(ctx.rawArgs[1]);
 
         // Validation
-        if (amount <= 0) {
+        if (!amount) {
+            return "Invalid amount.";
+        }
+        if (amount.lessThanOrEqualTo(0)) {
             return "Amount must be positive.";
         } else if (payerEntry.balance.lessThan(amount)) {
             return "You do not have enough balance to make that payment.";
@@ -65,9 +69,9 @@ export default {
 
         return new EmbedBuilder()
             .setTitle("Payment")
-            .setDescription(`${payerMention} sent $${amount} to ${payeeMention}`)
-            .addField(`${payerTitleName}'s new balance`, `$${newPayerBalance}`, true)
-            .addField(`${payeeTitleName}'s new balance`, `$${newPayeeBalance}`, true);
+            .setDescription(`${payerMention} sent $${amount.formatMoney()} to ${payeeMention}`)
+            .addField(`${payerTitleName}'s new balance`, `$${newPayerBalance.formatMoney()}`, true)
+            .addField(`${payeeTitleName}'s new balance`, `$${newPayeeBalance.formatMoney()}`, true);
 
     }
 } as BotCommand
