@@ -158,6 +158,7 @@ export default {
         let summary = "";
         let outcome: Outcome | null = null;
         let currentBet = bet;
+        let canDoubleDown = true;
 
         async function settle(result: Outcome): Promise<void> {
             if (settled) return;
@@ -199,7 +200,13 @@ export default {
             const playerField = `${formatCards(playerCards, renderCard)}\nTotal: ${player.total}${player.soft ? " (aces high)" : ""}`;
             const status = done
                 ? summary
-                : (summary || `React with ${HIT_EMOJI} to hit, ${STAND_EMOJI} to stand, or ${DOUBLE_EMOJI} to double down.`);
+                : (
+                    summary || (
+                        canDoubleDown
+                            ? `React with ${HIT_EMOJI} to hit, ${STAND_EMOJI} to stand, or ${DOUBLE_EMOJI} to double down.`
+                            : `React with ${HIT_EMOJI} to hit or ${STAND_EMOJI} to stand.`
+                    )
+                );
 
             const embed = new EmbedBuilder()
                 .setTitle(`Blackjack (bet: $${currentBet.formatMoney()})`)
@@ -290,6 +297,11 @@ export default {
                     }
 
                     if (emoji === normalizeEmoji(HIT_EMOJI)) {
+                        if (canDoubleDown) {
+                            canDoubleDown = false;
+                            await gameMessage.deleteReaction(DOUBLE_EMOJI).catch(() => {});
+                        }
+
                         playerCards.push(drawCard());
                         const total = handValue(playerCards);
 
@@ -324,6 +336,8 @@ export default {
                     }
 
                     if (emoji === normalizeEmoji(DOUBLE_EMOJI)) {
+                        if (!canDoubleDown) return;
+
                         const doubledBet = currentBet.mul(2);
                         if (player.balance.lessThan(doubledBet)) {
                             summary = `You cannot afford to double down to $${doubledBet.formatMoney()}.`;
